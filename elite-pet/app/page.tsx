@@ -17,88 +17,100 @@ interface Product {
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isBirthday] = useState(true);
+  
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState('');
   const [showToast, setShowToast] = useState(false);
+  
+  // Stări noi pentru banner-ul de zi de naștere
+  const [isBirthday, setIsBirthday] = useState(false);
+  const [petName, setPetName] = useState('');
 
   // Funcția de adăugare în coș
   const addToCart = (productToAdd: Product) => {
-    // 1. Luăm coșul curent din localStorage (dacă e gol, creăm un array gol [])
     const existingCart = JSON.parse(localStorage.getItem('cart') || '[]');
-    
-    // 2. Căutăm dacă produsul este deja în coș
     const itemIndex = existingCart.findIndex((item: any) => item.id === productToAdd.id);
     
     if (itemIndex >= 0) {
-      // Dacă există deja, creștem cantitatea
       existingCart[itemIndex].quantity += 1;
     } else {
-      // Dacă nu există, îl adăugăm ca produs nou, cantitate 1
       existingCart.push({ 
         id: productToAdd.id, 
         name: productToAdd.name, 
         price: productToAdd.price, 
-        image_url: productToAdd.image_url, // Asigură-te că folosim poza corectă (poate fi și safeImageUrl dacă ai o logică separată, dar aici luăm originalul pt simplitate)
+        image_url: productToAdd.image_url,
         quantity: 1 
       });
     }
     
-    // 3. Salvăm înapoi în localStorage
     localStorage.setItem('cart', JSON.stringify(existingCart));
     
-    // Un mic feedback vizual (opțional, poți folosi o alertă mai drăguță mai târziu)
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
 
   useEffect(() => {
-    setIsLoggedIn(localStorage.getItem('isLoggedIn') === 'true');
-    // Grab the name they registered with (default to Client if somehow missing)
+    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    setIsLoggedIn(loggedIn);
     setUserName(localStorage.getItem('userName') || 'Client');
+
+    // LOGICA PENTRU ZIUA DE NAȘTERE A ANIMALULUI
+    if (loggedIn) {
+      const savedAnimal = localStorage.getItem('petData');
+      if (savedAnimal) {
+        try {
+          const animalData = JSON.parse(savedAnimal);
+          if (animalData.dob && animalData.name) {
+            // Extragem luna nașterii și luna curentă
+            const dobMonth = new Date(animalData.dob).getMonth();
+            const currentMonth = new Date().getMonth();
+            
+            // Dacă lunile coincid, activăm bannerul!
+            if (dobMonth === currentMonth) {
+              setIsBirthday(true);
+              setPetName(animalData.name);
+            }
+          }
+        } catch (error) {
+          console.error("Eroare la citirea datelor animalului:", error);
+        }
+      }
+    }
   }, []);
 
-  // Simple logout function
   const handleLogout = () => {
     localStorage.removeItem('isLoggedIn');
     setIsLoggedIn(false);
+    setIsBirthday(false); // Ascundem bannerul dacă iese din cont
   };
 
   useEffect(() => {
     async function fetchProducts() {
       try {
-        console.log("Începem extragerea produselor pentru Home...");
-        
-        // Luăm produsele din Supabase
         const { data, error } = await supabase.from('products').select('*');
         
         if (error) {
           console.error('Eroare la extragerea Supabase:', error.message);
-          setProducts([]); // Dacă e eroare, golim lista ca să nu crape
+          setProducts([]);
         } else if (data) {
-          console.log("Produse găsite:", data.length);
           setProducts(data);
         }
       } catch (err) {
         console.error("Eroare neașteptată:", err);
       } finally {
-        // Indiferent dacă a mers sau a crăpat, OPRIM SPINNERUL!
         setLoading(false);
       }
     }
     fetchProducts();
   }, []);
 
-
-  
-
   return (
     <main className="min-h-screen bg-[#F4F5F7] font-sans">
       
-      {/* Banner Aniversar */}
+      {/* Banner Aniversar Dinamic */}
       {isBirthday && (
-        <div className="bg-yellow-400 px-4 py-1.5 text-center text-yellow-900 font-semibold text-xs border-b border-yellow-500 tracking-wide">
-          🎉 La mulți ani, Max! Ai 20% REDUCERE la jucării folosind codul: <span className="font-bold">MAX20</span>
+        <div className="bg-yellow-400 px-4 py-1.5 text-center text-yellow-900 font-semibold text-xs border-b border-yellow-500 tracking-wide animate-fade-in">
+          🎉 Sărbătorim luna de naștere! La mulți ani, <span className="font-black text-black">{petName}</span>! Ai 20% REDUCERE la jucării cu codul: <span className="font-black text-black">{petName.toUpperCase().replace(/\s/g, '')}20</span>
         </div>
       )}
 
@@ -111,50 +123,24 @@ export default function Home() {
           </div>
           <div className="flex items-center space-x-4 md:space-x-6">
             {isLoggedIn ? (
-               /* Containerul principal care activează 'group' pentru hover */
                <div className="hidden sm:block relative group py-2"> 
                  <Link href="/cont" className="text-sm font-bold text-green-600 hover:text-green-800 transition pb-1 cursor-pointer flex items-center gap-1">
                    <span>👤 Salut, {userName.split(' ')[0]}!</span>
-                   {/* O mică săgeată care se întoarce la hover */}
                    <span className="text-[10px] text-gray-400 group-hover:rotate-180 transition-transform duration-300">▼</span>
                  </Link>
                  
-                 {/* Meniul Dropdown (Apare lin la hover) */}
                  <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 overflow-hidden">
-                   
-                   {/* Un mic header în interiorul meniului */}
                    <div className="p-4 bg-[#183251] text-white">
                      <p className="font-black text-sm truncate">{userName}</p>
                      <p className="text-xs font-medium text-blue-200 mt-0.5">Membru ElitePet</p>
                    </div>
-                   
-                   {/* Lista cu opțiuni */}
                    <ul className="flex flex-col py-2">
-                     <li>
-                       <Link href="/cont" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">
-                         👤 Date Personale
-                       </Link>
-                     </li>
-                     <li>
-                       <Link href="/cont" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">
-                         🐾 Animalul Meu
-                       </Link>
-                     </li>
-                     <li>
-                       <Link href="/cont" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">
-                         📦 Istoric Comenzi
-                       </Link>
-                     </li>
-                     <li>
-                       <Link href="/cont" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">
-                         🔄 Retururi
-                       </Link>
-                     </li>
+                     <li><Link href="/cont" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">👤 Date Personale</Link></li>
+                     <li><Link href="/cont" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">🐾 Animalul Meu</Link></li>
+                     <li><Link href="/cont" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">📦 Istoric Comenzi</Link></li>
+                     <li><Link href="/cont" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">🔄 Retururi</Link></li>
                      <li className="border-t border-gray-100 mt-2 pt-2">
-                       {/* Butonul de Deconectare funcționează direct de aici */}
-                       <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-bold transition">
-                         🚪 Deconectare
-                       </button>
+                       <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-bold transition">🚪 Deconectare</button>
                      </li>
                    </ul>
                  </div>
@@ -232,7 +218,7 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-12 mt-4">
         
-{/* Bloc A: Catalog Produse (Carusel Infinit cu Săgeți) */}
+        {/* Bloc A: Catalog Produse (Carusel Infinit cu Săgeți) */}
         <section>
           <div className="flex justify-between items-end mb-6">
             <h2 className="text-xl md:text-3xl font-black text-black">Recomandate pentru tine</h2>
@@ -244,7 +230,6 @@ export default function Home() {
               <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-green-600"></div>
             </div>
           ) : (
-            /* FOLOSIM COMPONENTA NOUĂ AICI */
             <ProductCarousel products={products} addToCart={addToCart} />
           )}
         </section>
@@ -258,6 +243,7 @@ export default function Home() {
         </section>
 
       </div>
+      
       {showToast && (
         <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-4 rounded-xl shadow-2xl font-bold flex items-center space-x-3 z-50 animate-bounce">
           <span className="bg-green-500 rounded-full w-6 h-6 flex items-center justify-center text-sm">✓</span>
@@ -268,16 +254,12 @@ export default function Home() {
       {/* SUBSOL (FOOTER) COMPLET */}
       <footer className="bg-[#183251] text-white pt-12 pb-6 border-t-4 border-green-500 mt-12">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8 mb-8 border-b border-blue-900 pb-8">
-          
-          {/* Coloana 1: Brand */}
           <div>
             <Link href="/" className="text-3xl font-black tracking-tighter text-green-400">elite<span className="text-orange-500">pet</span></Link>
             <p className="text-blue-200 text-sm mt-4 font-medium leading-relaxed">
               Pasiunea noastră este fericirea animalului tău de companie. Oferim cele mai bune produse, la cele mai bune prețuri, cu livrare rapidă.
             </p>
           </div>
-
-          {/* Coloana 2: Link-uri Utile */}
           <div>
             <h3 className="font-bold text-lg mb-4 text-white">Informații Utile</h3>
             <ul className="space-y-2 text-sm text-blue-200 font-medium">
@@ -288,8 +270,6 @@ export default function Home() {
               <li><Link href="/cont" className="hover:text-green-400 transition">Contul Meu / Retur</Link></li>
             </ul>
           </div>
-
-          {/* Coloana 3: Program & Contact */}
           <div>
             <h3 className="font-bold text-lg mb-4 text-white">Contact & Program</h3>
             <ul className="space-y-2 text-sm text-blue-200 font-medium">
@@ -303,8 +283,6 @@ export default function Home() {
               <p className="text-xs text-blue-100 font-bold">Sâmbătă: 10:00 - 14:00</p>
             </div>
           </div>
-
-          {/* Coloana 4: ANPC / Siguranță */}
           <div>
             <h3 className="font-bold text-lg mb-4 text-white">Protecția Consumatorului</h3>
             <div className="space-y-3 flex flex-col">
@@ -319,9 +297,7 @@ export default function Home() {
               </a>
             </div>
           </div>
-
         </div>
-        
         <div className="text-center text-xs text-blue-400 font-bold">
           &copy; {new Date().getFullYear()} ElitePet SRL. Toate drepturile rezervate. Proiect pentru facultate.
         </div>
