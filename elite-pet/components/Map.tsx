@@ -40,7 +40,7 @@ export default function Map() {
       <MapContainer 
         center={position} 
         zoom={13} 
-        scrollWheelZoom={false} // Evităm zoom-ul accidental când dăm scroll pe pagină
+        scrollWheelZoom={true} // Evităm zoom-ul accidental când dăm scroll pe pagină
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
