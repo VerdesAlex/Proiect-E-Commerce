@@ -1,25 +1,35 @@
-// app/cont/page.tsx
 'use client'
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export default function ContulMeu() {
-  const [activeTab, setActiveTab] = useState('date');
+function ContulMeuContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+
+  // Setăm tab-ul activ bazat pe link-ul accesat (dacă nu e specificat, e 'date')
+  const [activeTab, setActiveTab] = useState(tabParam || 'date');
   const [userName, setUserName] = useState('Client');
   const [userEmail, setUserEmail] = useState('');
   const [mounted, setMounted] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // --- STĂRI PENTRU ANIMALE (Acum este o listă / array) ---
   const [animals, setAnimals] = useState<any[]>([]);
   const [showAnimalForm, setShowAnimalForm] = useState(false);
-  const [currentAnimal, setCurrentAnimal] = useState<any>({}); // Animalul curent editat/adăugat
+  const [currentAnimal, setCurrentAnimal] = useState<any>({}); 
 
   const [showInvoice, setShowInvoice] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
+
+  // Dacă utilizatorul navighează folosind dropdown-ul când este DEJA pe pagina de cont
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   useEffect(() => {
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
@@ -29,12 +39,10 @@ export default function ContulMeu() {
       setUserName(localStorage.getItem('userName') || 'Client');
       setUserEmail(localStorage.getItem('userEmail') || 'client@email.com');
       
-      // Încărcăm LISTA de animale din localStorage
       const savedAnimals = localStorage.getItem('petsDataList');
       if (savedAnimals) {
         setAnimals(JSON.parse(savedAnimals));
       } else {
-        // Dacă nu există nimic, îi punem pe Max by default ca să nu fie gol
         setAnimals([{
           id: 1,
           name: 'Max',
@@ -49,31 +57,30 @@ export default function ContulMeu() {
     setMounted(true);
   }, []);
 
-  // Salvarea unui animal (Nou sau Editat)
   const handleSaveAnimal = (e: React.FormEvent) => {
     e.preventDefault();
     let newAnimals;
-    
     if (currentAnimal.id) {
-      // Dacă are ID, înseamnă că EDITĂM unul existent
       newAnimals = animals.map(a => a.id === currentAnimal.id ? currentAnimal : a);
     } else {
-      // Dacă NU are ID, ADAUGĂM unul nou
       newAnimals = [...animals, { ...currentAnimal, id: Date.now() }];
     }
-    
     setAnimals(newAnimals);
     localStorage.setItem('petsDataList', JSON.stringify(newAnimals));
     setShowAnimalForm(false);
   };
 
-  // Ștergerea unui animal
   const handleDeleteAnimal = (id: number) => {
     if(confirm("Ești sigur că vrei să ștergi acest animal din contul tău?")) {
       const newAnimals = animals.filter(a => a.id !== id);
       setAnimals(newAnimals);
       localStorage.setItem('petsDataList', JSON.stringify(newAnimals));
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    window.location.href='/';
   };
 
   const downloadPDF = async () => {
@@ -109,15 +116,50 @@ export default function ContulMeu() {
   return (
     <div className="min-h-screen bg-[#F4F5F7] font-sans relative">
       <div className="print:hidden">
+        
+        {/* Navbar-ul cu Dropdown Actualizat */}
         <nav className="bg-white p-4 shadow-sm border-b sticky top-0 z-50">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
             <Link href="/" className="text-2xl font-black tracking-tight text-green-600">elite<span className="text-orange-500">pet</span></Link>
-            <Link href="/cos" className="text-sm font-bold text-black hover:text-green-600 transition">🛒 Coșul Meu</Link>
+            
+            <div className="flex items-center space-x-6">
+              <div className="hidden sm:block relative group py-2"> 
+                <Link href="/cont?tab=date" className="text-sm font-bold text-green-600 hover:text-green-800 transition pb-1 cursor-pointer flex items-center gap-1">
+                  <span>👤 Salut, {userName.split(' ')[0]}!</span>
+                  <span className="text-[10px] text-gray-400 group-hover:rotate-180 transition-transform duration-300">▼</span>
+                </Link>
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 overflow-hidden">
+                  <div className="p-4 bg-[#183251] text-white">
+                    <p className="font-black text-sm truncate">{userName}</p>
+                    <p className="text-xs font-medium text-blue-200 mt-0.5">Membru ElitePet</p>
+                  </div>
+                  <ul className="flex flex-col py-2">
+                     <li><Link href="/cont?tab=date" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">👤 Date Personale</Link></li>
+                     <li><Link href="/cont?tab=animal" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">🐾 Animalele Mele</Link></li>
+                     <li><Link href="/cont?tab=comenzi" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">📦 Istoric Comenzi</Link></li>
+                     <li><Link href="/cont?tab=retur" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">🔄 Retururi</Link></li>
+                     <li className="border-t border-gray-100 mt-2 pt-2">
+                       <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-bold transition">🚪 Deconectare</button>
+                     </li>
+                  </ul>
+                </div>
+              </div>
+              <Link href="/cos" className="text-sm font-bold text-black hover:text-green-600 transition">🛒 Coșul Meu</Link>
+            </div>
           </div>
+
+          <div className="border-t border-gray-100">
+          <div className="max-w-7xl mx-auto flex space-x-8 text-sm font-bold text-gray-700 p-3 overflow-x-auto">
+            <Link href="/produse?categorie=caini" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Câini</Link>
+            <Link href="/produse?categorie=pisici" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Pisici</Link>
+            <Link href="/produse?categorie=pasari" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Păsări</Link>
+            <Link href="/produse" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Toate Produsele</Link>
+          </div>
+        </div>
         </nav>
 
         <div className="max-w-7xl mx-auto p-4 md:p-8 mt-4 flex flex-col md:flex-row gap-8">
-          {/* MENIU LATERAL */}
+          {/* MENIU LATERAL (SIDEBAR) */}
           <aside className="w-full md:w-1/4">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="p-6 border-b border-gray-100 bg-[#183251] text-white">
@@ -125,11 +167,12 @@ export default function ContulMeu() {
                 <p className="text-sm font-bold opacity-90">Membru ElitePet</p>
               </div>
               <div className="flex flex-col">
+                {/* Folosim butoane normale aici pentru ca e deja pe pagina curentă */}
                 <button onClick={() => setActiveTab('date')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'date' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>👤 Date Personale</button>
                 <button onClick={() => setActiveTab('animal')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'animal' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>🐾 Animalele Mele</button>
                 <button onClick={() => setActiveTab('comenzi')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'comenzi' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>📦 Comenzile Mele</button>
                 <button onClick={() => setActiveTab('retur')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'retur' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>🔄 Retururi</button>
-                <button onClick={() => { localStorage.removeItem('isLoggedIn'); window.location.href='/'; }} className="p-4 text-left font-bold text-sm text-red-600 hover:bg-red-50 transition border-l-4 border-transparent mt-4 border-t border-gray-200">🚪 Deconectare</button>
+                <button onClick={handleLogout} className="p-4 text-left font-bold text-sm text-red-600 hover:bg-red-50 transition border-l-4 border-transparent mt-4 border-t border-gray-200">🚪 Deconectare</button>
               </div>
             </div>
           </aside>
@@ -148,12 +191,10 @@ export default function ContulMeu() {
               </div>
             )}
 
-            {/* TAB-UL ACTUALIZAT: ANIMALELE MELE */}
             {activeTab === 'animal' && (
               <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-200">
                 <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
                   <h2 className="text-2xl font-black text-black">Animalele Mele</h2>
-                  {/* BUTONUL DE ADĂUGARE */}
                   {!showAnimalForm && (
                     <button 
                       onClick={() => {
@@ -168,7 +209,6 @@ export default function ContulMeu() {
                 </div>
                 
                 {showAnimalForm ? (
-                  /* FORMULARUL DE ADAUGARE/EDITARE */
                   <form onSubmit={handleSaveAnimal} className="bg-orange-50 p-6 rounded-xl border border-orange-200 animate-fade-in">
                     <h3 className="font-black text-lg mb-4 text-orange-800">{currentAnimal.id ? 'Editează Profilul' : 'Adaugă Profil Nou'}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -185,7 +225,6 @@ export default function ContulMeu() {
                     </div>
                   </form>
                 ) : (
-                  /* LISTA DE ANIMALE */
                   <div className="space-y-6">
                     {animals.length === 0 ? (
                       <div className="text-center py-10 bg-gray-50 rounded-xl border border-gray-200">
@@ -195,7 +234,6 @@ export default function ContulMeu() {
                       animals.map((animal) => (
                         <div key={animal.id} className="bg-orange-50 rounded-xl p-6 border-2 border-orange-100 flex flex-col md:flex-row items-center md:items-start gap-6 relative overflow-hidden transition hover:border-orange-300">
                           
-                          {/* Butoane Acțiune pe Card */}
                           <div className="absolute top-4 right-4 flex gap-2 z-20">
                             <button onClick={() => { setCurrentAnimal(animal); setShowAnimalForm(true); }} className="bg-white px-3 py-1.5 rounded shadow-sm text-xs font-bold border border-gray-200 hover:bg-blue-50 hover:text-blue-700 transition">✏️ Editează</button>
                             <button onClick={() => handleDeleteAnimal(animal.id)} className="bg-white px-3 py-1.5 rounded shadow-sm text-xs font-bold border border-gray-200 text-red-500 hover:bg-red-50 transition">🗑️</button>
@@ -258,7 +296,6 @@ export default function ContulMeu() {
         </div>
       </div>
 
-      {/* POP-UP FACTURĂ - RĂMÂNE NESCHIMBAT */}
       {showInvoice && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -298,5 +335,14 @@ export default function ContulMeu() {
         </div>
       )}
     </div>
+  );
+}
+
+// Avem nevoie de componenta Suspense pentru a folosi searchParams din Next.js
+export default function ContulMeu() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold">Se încarcă contul...</div>}>
+      <ContulMeuContent />
+    </Suspense>
   );
 }
