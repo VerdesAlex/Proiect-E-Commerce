@@ -1,32 +1,35 @@
-// app/cont/page.tsx
 'use client'
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export default function ContulMeu() {
-  const [activeTab, setActiveTab] = useState('date');
+function ContulMeuContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+
+  // Setăm tab-ul activ bazat pe link-ul accesat (dacă nu e specificat, e 'date')
+  const [activeTab, setActiveTab] = useState(tabParam || 'date');
   const [userName, setUserName] = useState('Client');
   const [userEmail, setUserEmail] = useState('');
   const [mounted, setMounted] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const [isEditingAnimal, setIsEditingAnimal] = useState(false);
-  const [animal, setAnimal] = useState({
-    name: 'Max',
-    type: 'Câine',
-    breed: 'Bulldog Francez',
-    dob: '2023-05-12',
-    weight: '12',
-    allergies: 'Alergie pui'
-  });
+  const [animals, setAnimals] = useState<any[]>([]);
+  const [showAnimalForm, setShowAnimalForm] = useState(false);
+  const [currentAnimal, setCurrentAnimal] = useState<any>({}); 
 
   const [showInvoice, setShowInvoice] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  
-  // Ref-ul pentru a "prinde" zona facturii pe care vrem să o facem PDF
   const invoiceRef = useRef<HTMLDivElement>(null);
+
+  // Dacă utilizatorul navighează folosind dropdown-ul când este DEJA pe pagina de cont
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   useEffect(() => {
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
@@ -36,9 +39,19 @@ export default function ContulMeu() {
       setUserName(localStorage.getItem('userName') || 'Client');
       setUserEmail(localStorage.getItem('userEmail') || 'client@email.com');
       
-      const savedAnimal = localStorage.getItem('petData');
-      if (savedAnimal) {
-        setAnimal(JSON.parse(savedAnimal));
+      const savedAnimals = localStorage.getItem('petsDataList');
+      if (savedAnimals) {
+        setAnimals(JSON.parse(savedAnimals));
+      } else {
+        setAnimals([{
+          id: 1,
+          name: 'Max',
+          type: 'Câine',
+          breed: 'Bulldog Francez',
+          dob: '2023-05-12',
+          weight: '12',
+          allergies: 'Alergie pui'
+        }]);
       }
     }
     setMounted(true);
@@ -46,38 +59,43 @@ export default function ContulMeu() {
 
   const handleSaveAnimal = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('petData', JSON.stringify(animal));
-    setIsEditingAnimal(false);
+    let newAnimals;
+    if (currentAnimal.id) {
+      newAnimals = animals.map(a => a.id === currentAnimal.id ? currentAnimal : a);
+    } else {
+      newAnimals = [...animals, { ...currentAnimal, id: Date.now() }];
+    }
+    setAnimals(newAnimals);
+    localStorage.setItem('petsDataList', JSON.stringify(newAnimals));
+    setShowAnimalForm(false);
   };
 
-  // FUNCȚIA PENTRU DESCĂRCAREA AUTOMATĂ A PDF-ULUI
+  const handleDeleteAnimal = (id: number) => {
+    if(confirm("Ești sigur că vrei să ștergi acest animal din contul tău?")) {
+      const newAnimals = animals.filter(a => a.id !== id);
+      setAnimals(newAnimals);
+      localStorage.setItem('petsDataList', JSON.stringify(newAnimals));
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    window.location.href='/';
+  };
+
   const downloadPDF = async () => {
     const element = invoiceRef.current;
     if (!element) return;
-
-    setIsGeneratingPDF(true); // Arătăm un "loading" pe buton
-
+    setIsGeneratingPDF(true);
     try {
-      // 1. Facem "poza" clară a div-ului
-      const canvas = await html2canvas(element, {
-        scale: 2, // Calitate mai bună
-        useCORS: true,
-        backgroundColor: '#ffffff'
-      });
-      
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/png');
-      
-      // 2. Creăm documentul PDF (A4)
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      // 3. Lipim imaginea și salvăm
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Factura_EP_9024_${userName.replace(/\s+/g, '_')}.pdf`); // Numele descărcării
-      
+      pdf.save(`Factura_EP_9024_${userName.replace(/\s+/g, '_')}.pdf`);
     } catch (error) {
-      console.error("Eroare la generarea PDF-ului", error);
       alert("A apărut o eroare la descărcarea PDF-ului.");
     } finally {
       setIsGeneratingPDF(false);
@@ -97,17 +115,51 @@ export default function ContulMeu() {
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] font-sans relative">
-      
       <div className="print:hidden">
+        
+        {/* Navbar-ul cu Dropdown Actualizat */}
         <nav className="bg-white p-4 shadow-sm border-b sticky top-0 z-50">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
             <Link href="/" className="text-2xl font-black tracking-tight text-green-600">elite<span className="text-orange-500">pet</span></Link>
-            <Link href="/cos" className="text-sm font-bold text-black hover:text-green-600 transition">🛒 Coșul Meu</Link>
+            
+            <div className="flex items-center space-x-6">
+              <div className="hidden sm:block relative group py-2"> 
+                <Link href="/cont?tab=date" className="text-sm font-bold text-green-600 hover:text-green-800 transition pb-1 cursor-pointer flex items-center gap-1">
+                  <span>👤 Salut, {userName.split(' ')[0]}!</span>
+                  <span className="text-[10px] text-gray-400 group-hover:rotate-180 transition-transform duration-300">▼</span>
+                </Link>
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 overflow-hidden">
+                  <div className="p-4 bg-[#183251] text-white">
+                    <p className="font-black text-sm truncate">{userName}</p>
+                    <p className="text-xs font-medium text-blue-200 mt-0.5">Membru ElitePet</p>
+                  </div>
+                  <ul className="flex flex-col py-2">
+                     <li><Link href="/cont?tab=date" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">👤 Date Personale</Link></li>
+                     <li><Link href="/cont?tab=animal" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">🐾 Animalele Mele</Link></li>
+                     <li><Link href="/cont?tab=comenzi" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">📦 Istoric Comenzi</Link></li>
+                     <li><Link href="/cont?tab=retur" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">🔄 Retururi</Link></li>
+                     <li className="border-t border-gray-100 mt-2 pt-2">
+                       <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-bold transition">🚪 Deconectare</button>
+                     </li>
+                  </ul>
+                </div>
+              </div>
+              <Link href="/cos" className="text-sm font-bold text-black hover:text-green-600 transition">🛒 Coșul Meu</Link>
+            </div>
           </div>
+
+          <div className="border-t border-gray-100">
+          <div className="max-w-7xl mx-auto flex space-x-8 text-sm font-bold text-gray-700 p-3 overflow-x-auto">
+            <Link href="/produse?categorie=caini" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Câini</Link>
+            <Link href="/produse?categorie=pisici" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Pisici</Link>
+            <Link href="/produse?categorie=pasari" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Păsări</Link>
+            <Link href="/produse" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Toate Produsele</Link>
+          </div>
+        </div>
         </nav>
 
         <div className="max-w-7xl mx-auto p-4 md:p-8 mt-4 flex flex-col md:flex-row gap-8">
-          {/* MENIU LATERAL */}
+          {/* MENIU LATERAL (SIDEBAR) */}
           <aside className="w-full md:w-1/4">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="p-6 border-b border-gray-100 bg-[#183251] text-white">
@@ -115,11 +167,12 @@ export default function ContulMeu() {
                 <p className="text-sm font-bold opacity-90">Membru ElitePet</p>
               </div>
               <div className="flex flex-col">
+                {/* Folosim butoane normale aici pentru ca e deja pe pagina curentă */}
                 <button onClick={() => setActiveTab('date')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'date' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>👤 Date Personale</button>
-                <button onClick={() => setActiveTab('animal')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'animal' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>🐾 Animalul Meu</button>
+                <button onClick={() => setActiveTab('animal')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'animal' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>🐾 Animalele Mele</button>
                 <button onClick={() => setActiveTab('comenzi')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'comenzi' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>📦 Comenzile Mele</button>
                 <button onClick={() => setActiveTab('retur')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'retur' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>🔄 Retururi</button>
-                <button onClick={() => { localStorage.removeItem('isLoggedIn'); window.location.href='/'; }} className="p-4 text-left font-bold text-sm text-red-600 hover:bg-red-50 transition border-l-4 border-transparent mt-4 border-t border-gray-200">🚪 Deconectare</button>
+                <button onClick={handleLogout} className="p-4 text-left font-bold text-sm text-red-600 hover:bg-red-50 transition border-l-4 border-transparent mt-4 border-t border-gray-200">🚪 Deconectare</button>
               </div>
             </div>
           </aside>
@@ -141,39 +194,68 @@ export default function ContulMeu() {
             {activeTab === 'animal' && (
               <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-200">
                 <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
-                  <h2 className="text-2xl font-black text-black">Profilul Animalului</h2>
-                  {!isEditingAnimal && (
-                    <button onClick={() => setIsEditingAnimal(true)} className="text-blue-700 font-bold text-sm hover:underline border border-blue-200 bg-blue-50 px-3 py-1 rounded">✏️ Editează profilul</button>
+                  <h2 className="text-2xl font-black text-black">Animalele Mele</h2>
+                  {!showAnimalForm && (
+                    <button 
+                      onClick={() => {
+                        setCurrentAnimal({ name: '', type: '', breed: '', dob: '', weight: '', allergies: '' });
+                        setShowAnimalForm(true);
+                      }} 
+                      className="text-green-700 font-bold text-sm hover:underline border border-green-200 bg-green-50 px-3 py-1.5 rounded transition hover:bg-green-100"
+                    >
+                      + Adaugă animal nou
+                    </button>
                   )}
                 </div>
                 
-                {isEditingAnimal ? (
-                  <form onSubmit={handleSaveAnimal} className="bg-orange-50 p-6 rounded-xl border border-orange-200">
+                {showAnimalForm ? (
+                  <form onSubmit={handleSaveAnimal} className="bg-orange-50 p-6 rounded-xl border border-orange-200 animate-fade-in">
+                    <h3 className="font-black text-lg mb-4 text-orange-800">{currentAnimal.id ? 'Editează Profilul' : 'Adaugă Profil Nou'}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div><label className="block font-bold text-black text-sm mb-1">Numele Animalului</label><input required type="text" value={animal.name} onChange={e => setAnimal({...animal, name: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
-                      <div><label className="block font-bold text-black text-sm mb-1">Specie (ex: Câine, Pisică)</label><input required type="text" value={animal.type} onChange={e => setAnimal({...animal, type: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
-                      <div><label className="block font-bold text-black text-sm mb-1">Rasă</label><input type="text" value={animal.breed} onChange={e => setAnimal({...animal, breed: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
-                      <div><label className="block font-bold text-black text-sm mb-1">Data Nașterii</label><input type="date" value={animal.dob} onChange={e => setAnimal({...animal, dob: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
-                      <div><label className="block font-bold text-black text-sm mb-1">Greutate (kg)</label><input type="number" value={animal.weight} onChange={e => setAnimal({...animal, weight: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
-                      <div><label className="block font-bold text-black text-sm mb-1">Alergii/Sensibilități</label><input type="text" value={animal.allergies} onChange={e => setAnimal({...animal, allergies: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
+                      <div><label className="block font-bold text-black text-sm mb-1">Numele Animalului</label><input required type="text" value={currentAnimal.name || ''} onChange={e => setCurrentAnimal({...currentAnimal, name: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
+                      <div><label className="block font-bold text-black text-sm mb-1">Specie (ex: Câine, Pisică)</label><input required type="text" value={currentAnimal.type || ''} onChange={e => setCurrentAnimal({...currentAnimal, type: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
+                      <div><label className="block font-bold text-black text-sm mb-1">Rasă</label><input type="text" value={currentAnimal.breed || ''} onChange={e => setCurrentAnimal({...currentAnimal, breed: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
+                      <div><label className="block font-bold text-black text-sm mb-1">Data Nașterii</label><input type="date" value={currentAnimal.dob || ''} onChange={e => setCurrentAnimal({...currentAnimal, dob: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
+                      <div><label className="block font-bold text-black text-sm mb-1">Greutate (kg)</label><input type="number" value={currentAnimal.weight || ''} onChange={e => setCurrentAnimal({...currentAnimal, weight: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
+                      <div><label className="block font-bold text-black text-sm mb-1">Alergii/Sensibilități</label><input type="text" value={currentAnimal.allergies || ''} onChange={e => setCurrentAnimal({...currentAnimal, allergies: e.target.value})} className="w-full p-2 border-2 border-orange-200 rounded font-bold text-black outline-none" /></div>
                     </div>
                     <div className="mt-6 flex gap-4">
-                      <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-6 rounded shadow">Salvează Datele</button>
-                      <button type="button" onClick={() => setIsEditingAnimal(false)} className="bg-gray-200 hover:bg-gray-300 text-black font-bold py-2 px-6 rounded">Anulează</button>
+                      <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-6 rounded shadow transition">Salvează Datele</button>
+                      <button type="button" onClick={() => setShowAnimalForm(false)} className="bg-white border border-gray-300 hover:bg-gray-100 text-black font-bold py-2 px-6 rounded transition">Anulează</button>
                     </div>
                   </form>
                 ) : (
-                  <div className="bg-orange-50 rounded-xl p-6 border-2 border-orange-100 flex flex-col md:flex-row items-center md:items-start gap-6 relative overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=400&q=80" alt={animal.name} className="w-32 h-32 object-cover rounded-full border-4 border-white shadow-md z-10" />
-                    <div className="flex-1 text-center md:text-left z-10">
-                      <h3 className="text-3xl font-black text-orange-600 mb-1">{animal.name}</h3>
-                      <p className="text-black font-bold mb-4">{animal.type} • {animal.breed}</p>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-white p-4 rounded-lg shadow-sm border border-orange-100">
-                        <div><p className="text-xs text-gray-500 font-bold uppercase">Data Nașterii</p><p className="font-black text-black">{animal.dob || 'Nespecificat'}</p></div>
-                        <div><p className="text-xs text-gray-500 font-bold uppercase">Greutate</p><p className="font-black text-black">{animal.weight} kg</p></div>
-                        <div><p className="text-xs text-gray-500 font-bold uppercase">Sensibilități</p><p className="font-black text-red-600">{animal.allergies || 'Niciuna'}</p></div>
+                  <div className="space-y-6">
+                    {animals.length === 0 ? (
+                      <div className="text-center py-10 bg-gray-50 rounded-xl border border-gray-200">
+                        <p className="text-gray-500 font-bold mb-4">Nu ai adăugat niciun animal încă.</p>
                       </div>
-                    </div>
+                    ) : (
+                      animals.map((animal) => (
+                        <div key={animal.id} className="bg-orange-50 rounded-xl p-6 border-2 border-orange-100 flex flex-col md:flex-row items-center md:items-start gap-6 relative overflow-hidden transition hover:border-orange-300">
+                          
+                          <div className="absolute top-4 right-4 flex gap-2 z-20">
+                            <button onClick={() => { setCurrentAnimal(animal); setShowAnimalForm(true); }} className="bg-white px-3 py-1.5 rounded shadow-sm text-xs font-bold border border-gray-200 hover:bg-blue-50 hover:text-blue-700 transition">✏️ Editează</button>
+                            <button onClick={() => handleDeleteAnimal(animal.id)} className="bg-white px-3 py-1.5 rounded shadow-sm text-xs font-bold border border-gray-200 text-red-500 hover:bg-red-50 transition">🗑️</button>
+                          </div>
+
+                          <div className="absolute -right-4 -top-4 text-9xl opacity-5 pointer-events-none">🐾</div>
+                          
+                          <img src="https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=400&q=80" alt={animal.name} className="w-24 h-24 md:w-32 md:h-32 object-cover rounded-full border-4 border-white shadow-md z-10" />
+                          
+                          <div className="flex-1 text-center md:text-left z-10 w-full mt-4 md:mt-0">
+                            <h3 className="text-2xl md:text-3xl font-black text-orange-600 mb-1">{animal.name}</h3>
+                            <p className="text-black font-bold mb-4">{animal.type} • {animal.breed}</p>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-white p-4 rounded-lg shadow-sm border border-orange-100">
+                              <div><p className="text-[10px] md:text-xs text-gray-500 font-bold uppercase">Data Nașterii</p><p className="font-black text-black">{animal.dob || '-'}</p></div>
+                              <div><p className="text-[10px] md:text-xs text-gray-500 font-bold uppercase">Greutate</p><p className="font-black text-black">{animal.weight ? `${animal.weight} kg` : '-'}</p></div>
+                              <div><p className="text-[10px] md:text-xs text-gray-500 font-bold uppercase">Sensibilități</p><p className="font-black text-red-600 truncate">{animal.allergies || 'Niciuna'}</p></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -195,12 +277,7 @@ export default function ContulMeu() {
                       <p className="text-sm text-black font-bold">2 produse</p>
                       <p className="font-black text-black text-xl">345,00 Lei</p>
                     </div>
-                    <button 
-                      onClick={() => setShowInvoice(true)} 
-                      className="mt-4 bg-blue-50 border border-blue-200 text-blue-800 font-bold text-sm px-4 py-2 rounded hover:bg-blue-100 transition"
-                    >
-                      📄 Vezi factura & Detalii
-                    </button>
+                    <button onClick={() => setShowInvoice(true)} className="mt-4 bg-blue-50 border border-blue-200 text-blue-800 font-bold text-sm px-4 py-2 rounded hover:bg-blue-100 transition">📄 Vezi factura & Detalii</button>
                   </div>
                 </div>
               </div>
@@ -219,66 +296,26 @@ export default function ContulMeu() {
         </div>
       </div>
 
-      {/* POP-UP FACTURĂ - CU REF-UL PENTRU DESCĂRCARE */}
       {showInvoice && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            
-            {/* ZONA CAPTURATĂ DE PDF (invoiceRef) */}
             <div ref={invoiceRef} className="bg-white">
-              {/* Header Factură */}
               <div className="bg-gray-100 p-6 border-b border-gray-300 flex justify-between items-start">
-                <div>
-                  <h2 className="text-2xl font-black text-black">Factură Fiscală</h2>
-                  <p className="text-black font-bold text-sm mt-1">Seria EP Nr. 9024</p>
-                </div>
-                <div className="text-right text-black font-bold text-sm">
-                  <p>Data: 10/03/2026</p>
-                  <p>Status: <span className="text-green-600">Achitată</span></p>
-                </div>
+                <div><h2 className="text-2xl font-black text-black">Factură Fiscală</h2><p className="text-black font-bold text-sm mt-1">Seria EP Nr. 9024</p></div>
+                <div className="text-right text-black font-bold text-sm"><p>Data: 10/03/2026</p><p>Status: <span className="text-green-600">Achitată</span></p></div>
               </div>
-
-              {/* Corp Factură */}
               <div className="p-6 font-mono text-sm text-black">
                 <div className="flex justify-between border-b-2 border-black pb-4 mb-4">
-                  <div>
-                    <p className="font-black text-base uppercase">Furnizor:</p>
-                    <p className="font-bold">ElitePet SRL</p>
-                    <p>CUI: RO12345678</p>
-                    <p>București, România</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-black text-base uppercase">Client:</p>
-                    <p className="font-bold">{userName}</p>
-                    <p>{userEmail}</p>
-                  </div>
+                  <div><p className="font-black text-base uppercase">Furnizor:</p><p className="font-bold">ElitePet SRL</p><p>CUI: RO12345678</p><p>București, România</p></div>
+                  <div className="text-right"><p className="font-black text-base uppercase">Client:</p><p className="font-bold">{userName}</p><p>{userEmail}</p></div>
                 </div>
-
                 <table className="w-full text-left border-collapse mb-6">
-                  <thead>
-                    <tr className="border-b border-gray-400">
-                      <th className="py-2 font-black">Produs</th>
-                      <th className="py-2 font-black text-center">Cant.</th>
-                      <th className="py-2 font-black text-right">Preț unitar</th>
-                      <th className="py-2 font-black text-right">Total</th>
-                    </tr>
-                  </thead>
+                  <thead><tr className="border-b border-gray-400"><th className="py-2 font-black">Produs</th><th className="py-2 font-black text-center">Cant.</th><th className="py-2 font-black text-right">Preț unitar</th><th className="py-2 font-black text-right">Total</th></tr></thead>
                   <tbody>
-                    <tr className="border-b border-gray-200">
-                      <td className="py-3 font-bold">Hrană uscată Câini Purina Pro Plan</td>
-                      <td className="py-3 text-center font-bold">1</td>
-                      <td className="py-3 text-right font-bold">289.00 Lei</td>
-                      <td className="py-3 text-right font-bold">289.00 Lei</td>
-                    </tr>
-                    <tr className="border-b border-gray-200">
-                      <td className="py-3 font-bold">Zgardă reflectorizantă M</td>
-                      <td className="py-3 text-center font-bold">1</td>
-                      <td className="py-3 text-right font-bold">56.00 Lei</td>
-                      <td className="py-3 text-right font-bold">56.00 Lei</td>
-                    </tr>
+                    <tr className="border-b border-gray-200"><td className="py-3 font-bold">Hrană uscată Câini Purina Pro Plan</td><td className="py-3 text-center font-bold">1</td><td className="py-3 text-right font-bold">289.00 Lei</td><td className="py-3 text-right font-bold">289.00 Lei</td></tr>
+                    <tr className="border-b border-gray-200"><td className="py-3 font-bold">Zgardă reflectorizantă M</td><td className="py-3 text-center font-bold">1</td><td className="py-3 text-right font-bold">56.00 Lei</td><td className="py-3 text-right font-bold">56.00 Lei</td></tr>
                   </tbody>
                 </table>
-
                 <div className="flex justify-end text-base">
                   <div className="w-full md:w-1/2">
                     <div className="flex justify-between border-b border-gray-200 py-1 font-bold"><p>Subtotal:</p><p>345.00 Lei</p></div>
@@ -288,25 +325,24 @@ export default function ContulMeu() {
                 </div>
               </div>
             </div>
-
-            {/* Butoane Acțiune (Astea NU apar in PDF, pentru ca sunt in afara ref-ului) */}
             <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-4 mt-auto">
-              <button 
-                onClick={downloadPDF} 
-                disabled={isGeneratingPDF}
-                className={`text-white px-6 py-2 rounded font-bold transition flex items-center space-x-2 ${isGeneratingPDF ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
-              >
+              <button onClick={downloadPDF} disabled={isGeneratingPDF} className={`text-white px-6 py-2 rounded font-bold transition flex items-center space-x-2 ${isGeneratingPDF ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
                 <span>{isGeneratingPDF ? 'Se generează...' : '⬇️ Descarcă PDF'}</span>
               </button>
-              <button onClick={() => setShowInvoice(false)} className="bg-gray-800 hover:bg-black text-white px-6 py-2 rounded font-bold transition">
-                Închide
-              </button>
+              <button onClick={() => setShowInvoice(false)} className="bg-gray-800 hover:bg-black text-white px-6 py-2 rounded font-bold transition">Închide</button>
             </div>
-            
           </div>
         </div>
       )}
-
     </div>
+  );
+}
+
+// Avem nevoie de componenta Suspense pentru a folosi searchParams din Next.js
+export default function ContulMeu() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold">Se încarcă contul...</div>}>
+      <ContulMeuContent />
+    </Suspense>
   );
 }
