@@ -42,7 +42,7 @@ export default function AuthPage() {
       localStorage.setItem('userPassword', password);
       localStorage.setItem('isLoggedIn', 'true'); // Auto-login after register
       
-      window.location.href = '/cos';
+      window.location.href = '/';
     }
   };
 
