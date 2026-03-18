@@ -14,7 +14,7 @@ function ProductDetailContent() {
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Funcția corectă de adăugare în coș
+  // Funcția corectă de adăugare în coșs
   const addToCart = () => {
     if (!product) return;
 
