@@ -83,14 +83,16 @@ export default function ProductCarousel({ products, addToCart }: { products: Pro
                 <div className="p-3 flex flex-col flex-grow border-t border-gray-50">
                     <h3 className="font-bold text-xs text-black leading-tight line-clamp-2 mb-3 h-8">{product.name}</h3>
                     
+                    <div className="text-center py-1">
+                        <p className="text-green-600 font-black text-base">{product.price} Lei</p>
+                    </div>
+
                     <div className="mt-auto space-y-2">
                     <Link href={`/produs?id=${product.id}`} className="w-full block text-center border-2 border-gray-200 text-black hover:bg-gray-100 text-xs font-bold py-1.5 rounded transition">
                         🔍 Detalii
                     </Link>
                     
-                    <div className="text-center py-1">
-                        <p className="text-green-600 font-black text-base">{product.price} Lei</p>
-                    </div>
+                    
 
                     <button 
                         onClick={() => addToCart(product)} 
