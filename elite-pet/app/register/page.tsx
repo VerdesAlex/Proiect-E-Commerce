@@ -1,61 +1,81 @@
+// app/register/page.tsx
 'use client'
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { supabase } from '../../lib/SupabaseClient'; // Importăm Supabase!
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   
-  // States for input fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  // State for showing errors (like "Wrong Password")
   const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false); // Adăugăm un state de loading
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(''); // Reset errors
+    setErrorMsg('');
+    setIsLoading(true);
 
     if (isLogin) {
-      // --- LOG IN LOGIC ---
-      const savedEmail = localStorage.getItem('userEmail');
-      const savedPassword = localStorage.getItem('userPassword');
+      // --- LOG IN LOGIC (SUPABASE) ---
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
 
-      if (!savedEmail) {
-        setErrorMsg('Acest cont nu există. Te rugăm să creezi unul.');
+      if (error) {
+        setErrorMsg(error.message === 'Invalid login credentials' ? 'Email sau parolă incorectă!' : error.message);
+        setIsLoading(false);
         return;
       }
-      if (email !== savedEmail || password !== savedPassword) {
-        setErrorMsg('Email sau parolă incorectă!');
-        return;
-      }
-      // If we reach here, login is successful!
+
+      // Logare cu succes! Salvăm datele local ca să funcționeze restul site-ului
+      const userMetadata = data.user?.user_metadata;
+      localStorage.setItem('userName', userMetadata?.full_name || 'Client');
+      localStorage.setItem('userEmail', data.user?.email || email);
       localStorage.setItem('isLoggedIn', 'true');
+      
       window.location.href = '/';
 
     } else {
-      // --- REGISTER LOGIC ---
-      // Save credentials to our "mini-database" (localStorage)
+      // --- REGISTER LOGIC (SUPABASE) ---
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            full_name: name, // Salvăm numele în Supabase metadata
+          }
+        }
+      });
+
+      if (error) {
+        setErrorMsg(error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      // Înregistrare cu succes! 
       localStorage.setItem('userName', name);
       localStorage.setItem('userEmail', email);
-      localStorage.setItem('userPassword', password);
-      localStorage.setItem('isLoggedIn', 'true'); // Auto-login after register
+      localStorage.setItem('isLoggedIn', 'true');
       
       window.location.href = '/';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <nav className="bg-[#183251] p-4 text-white text-center shadow-md">
-        <Link href="/" className="text-3xl font-black text-green-400">elite<span className="text-orange-500">pet</span></Link>
+    <div className="min-h-screen bg-[#F4F5F7] flex flex-col font-sans">
+      <nav className="bg-white border-b border-gray-200 shadow-sm p-4 text-center">
+        <Link href="/" className="text-3xl font-black text-green-600 tracking-tighter">elite<span className="text-orange-500">pet</span></Link>
       </nav>
 
       <div className="flex-grow flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
           
-          {/* TABS */}
           <div className="flex border-b border-gray-200">
             <button 
               onClick={() => { setIsLogin(true); setErrorMsg(''); }} 
@@ -71,60 +91,63 @@ export default function AuthPage() {
             </button>
           </div>
 
-          {/* FORM */}
           <div className="p-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">
+            <h2 className="text-2xl font-black text-black mb-2 text-center">
               {isLogin ? 'Bine ai revenit!' : 'Alătură-te comunității'}
             </h2>
 
-            {/* ERROR MESSAGE BOX */}
             {errorMsg && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm font-bold text-center">
-                {errorMsg}
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm font-bold text-center">
+                ⚠️ {errorMsg}
               </div>
             )}
             
             <form onSubmit={handleAuth} className="space-y-4 mt-6">
               {!isLogin && (
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nume Complet</label>
+                  <label className="block text-sm font-bold text-black mb-1">Nume Complet</label>
                   <input 
                     required 
                     type="text" 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black font-medium" 
+                    className="w-full border-2 border-gray-300 p-3 rounded-lg focus:border-green-500 outline-none text-black font-bold transition" 
                     placeholder="Ex: Ion Popescu" 
                   />
                 </div>
               )}
               
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Adresă de Email</label>
+                <label className="block text-sm font-bold text-black mb-1">Adresă de Email</label>
                 <input 
                   required 
                   type="email" 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black font-medium" 
+                  className="w-full border-2 border-gray-300 p-3 rounded-lg focus:border-green-500 outline-none text-black font-bold transition" 
                   placeholder="adresa@email.com" 
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Parolă</label>
+                <label className="block text-sm font-bold text-black mb-1">Parolă (Min. 6 caractere)</label>
                 <input 
                   required 
                   type="password" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black font-medium" 
+                  minLength={6}
+                  className="w-full border-2 border-gray-300 p-3 rounded-lg focus:border-green-500 outline-none text-black font-bold transition" 
                   placeholder="••••••••" 
                 />
               </div>
 
-              <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg mt-4 shadow-md transition">
-                {isLogin ? 'Autentificare' : 'Creează Contul'}
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className={`w-full text-white font-black py-4 rounded-xl mt-4 shadow-md transition ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+              >
+                {isLoading ? 'Se procesează...' : (isLogin ? 'Autentificare' : 'Creează Contul')}
               </button>
             </form>
           </div>
