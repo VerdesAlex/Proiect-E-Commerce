@@ -54,36 +54,85 @@ export default function Home() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  useEffect(() => {
-    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    setIsLoggedIn(loggedIn);
-    setUserName(localStorage.getItem('userName') || 'Client');
+useEffect(() => {
+    // 1. Verificăm dacă există o sesiune activă în Supabase
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        setIsLoggedIn(true);
+        // Tragem automat numele din contul de Google (sau prima parte din email)
+        const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Client';
+        setUserName(name);
+        
+        // Sincronizăm cu localStorage pentru ca restul site-ului să meargă la fel ca înainte
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userName', name);
+        if(user.email) localStorage.setItem('userEmail', user.email);
+      } else {
+        // Fallback pentru vechiul sistem
+        const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        setIsLoggedIn(loggedIn);
+        setUserName(localStorage.getItem('userName') || 'Client');
+      }
 
-    if (loggedIn) {
-      const savedAnimals = localStorage.getItem('petsDataList');
-      if (savedAnimals) {
-        try {
-          const animalsList = JSON.parse(savedAnimals);
-          const birthdayPet = animalsList.find((pet: any) => {
-             if (!pet.dob) return false;
-             const dobMonth = new Date(pet.dob).getMonth();
-             const currentMonth = new Date().getMonth();
-             return dobMonth === currentMonth;
-          });
+      // Verificăm ziua de naștere a animalelor doar dacă utilizatorul este logat
+      if (user || localStorage.getItem('isLoggedIn') === 'true') {
+        const savedAnimals = localStorage.getItem('petsDataList');
+        if (savedAnimals) {
+          try {
+            const animalsList = JSON.parse(savedAnimals);
+            const birthdayPet = animalsList.find((pet: any) => {
+               if (!pet.dob) return false;
+               const dobMonth = new Date(pet.dob).getMonth();
+               const currentMonth = new Date().getMonth();
+               return dobMonth === currentMonth;
+            });
 
-          if (birthdayPet) {
-            setIsBirthday(true);
-            setPetName(birthdayPet.name);
+            if (birthdayPet) {
+              setIsBirthday(true);
+              setPetName(birthdayPet.name);
+            }
+          } catch (error) {
+            console.error("Eroare la citirea datelor animalelor:", error);
           }
-        } catch (error) {
-          console.error("Eroare la citirea datelor animalelor:", error);
         }
       }
-    }
+    };
+
+    checkUser();
+
+    // 2. Ascultăm automat redirecționarea de la Google
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setIsLoggedIn(true);
+        const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Client';
+        setUserName(name);
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userName', name);
+        if(session.user.email) localStorage.setItem('userEmail', session.user.email);
+      } else if (event === 'SIGNED_OUT') {
+        setIsLoggedIn(false);
+        setUserName('');
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userEmail');
+      }
+    });
+
+    // Curățăm listener-ul când plecăm de pe pagină
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
-  const handleLogout = () => {
+  // 3. Modificăm Logout-ul ca să taie și conexiunea cu Google/Supabase
+  const handleLogout = async () => {
+    await supabase.auth.signOut(); // Deconectare reală din backend
+    
     localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userEmail');
     setIsLoggedIn(false);
     setIsBirthday(false);
   };
