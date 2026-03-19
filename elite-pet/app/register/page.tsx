@@ -67,6 +67,22 @@ export default function AuthPage() {
     }
   };
 
+  const loginWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // Folosim window.location.origin ca să funcționeze perfect 
+        // și pe localhost:3000 și pe domeniul de producție (Vercel)
+        redirectTo: `${window.location.origin}/` 
+      }
+    });
+
+    if (error) {
+      console.error("Eroare la logarea cu Google:", error.message);
+      alert("A apărut o eroare la conectarea cu Google.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F4F5F7] flex flex-col font-sans">
       <nav className="bg-white border-b border-gray-200 shadow-sm p-4 text-center">
@@ -88,6 +104,26 @@ export default function AuthPage() {
               className={`w-1/2 py-4 font-bold text-sm transition ${!isLogin ? 'bg-white text-green-600 border-b-2 border-green-600' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
             >
               Creare cont nou
+            </button>
+          </div>
+
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500 font-bold">SAU</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={loginWithGoogle}
+              className="w-full mt-6 flex items-center justify-center gap-3 bg-white border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-800 font-bold py-3.5 rounded-xl transition shadow-sm"
+            >
+              <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
+              Continuă cu Google
             </button>
           </div>
 

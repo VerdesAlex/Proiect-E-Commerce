@@ -6,6 +6,9 @@ import Link from 'next/link';
 export default function PaymentGateway() {
   const [total, setTotal] = useState(0);
   const [cardNumber, setCardNumber] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [cvc, setCvc] = useState('');
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -17,6 +20,29 @@ export default function PaymentGateway() {
     setTotal(suma);
     setMounted(true);
   }, []);
+
+  // Formatare Automată Număr Card (Spațiu la fiecare 4 cifre)
+  const handleCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ''); // Păstrăm doar cifrele
+    const formatted = value.match(/.{1,4}/g)?.join(' ') || value; // Grupăm câte 4
+    setCardNumber(formatted);
+  };
+
+  // Formatare Automată Data Expirării (Adăugare / automat)
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, ''); // Păstrăm doar cifrele
+    if (value.length > 2) {
+      // Dacă avem mai mult de 2 cifre, punem slash între lună și an
+      value = value.substring(0, 2) + '/' + value.substring(2, 4);
+    }
+    setExpiryDate(value);
+  };
+
+  // Păstrăm doar cifrele la CVC
+  const handleCvcChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    setCvc(value);
+  };
 
   const handlePayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +94,6 @@ export default function PaymentGateway() {
             </div>
           )}
 
-          {/* TEXTUL AICI E ACUM NEGRU/ALBASTRU INCHIS */}
           <div className="bg-blue-50 text-blue-900 p-4 rounded-lg text-sm mb-6 font-bold border-2 border-blue-200 flex items-start">
             <span className="text-2xl mr-2">ℹ️</span>
             <div>
@@ -84,21 +109,37 @@ export default function PaymentGateway() {
                 required 
                 type="text" 
                 value={cardNumber}
-                onChange={(e) => setCardNumber(e.target.value)}
+                onChange={handleCardChange}
                 className="w-full border-2 border-gray-300 p-3 rounded-md font-mono text-lg focus:ring-2 focus:ring-blue-500 outline-none text-black font-bold" 
                 placeholder="0000 0000 0000 0000" 
-                maxLength={19}
+                maxLength={19} // 16 cifre + 3 spații
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-black text-black mb-1">Data expirării</label>
-                <input required type="text" className="w-full border-2 border-gray-300 p-3 rounded-md font-mono focus:ring-2 focus:ring-blue-500 outline-none text-black font-bold" placeholder="LL/AA" />
+                <input 
+                  required 
+                  type="text" 
+                  value={expiryDate}
+                  onChange={handleExpiryChange}
+                  className="w-full border-2 border-gray-300 p-3 rounded-md font-mono focus:ring-2 focus:ring-blue-500 outline-none text-black font-bold" 
+                  placeholder="LL/AA" 
+                  maxLength={5} // 4 cifre + 1 slash
+                />
               </div>
               <div>
                 <label className="block text-sm font-black text-black mb-1">CVC / CVV</label>
-                <input required type="password" className="w-full border-2 border-gray-300 p-3 rounded-md font-mono focus:ring-2 focus:ring-blue-500 outline-none text-black font-bold" placeholder="123" maxLength={3} />
+                <input 
+                  required 
+                  type="password" 
+                  value={cvc}
+                  onChange={handleCvcChange}
+                  className="w-full border-2 border-gray-300 p-3 rounded-md font-mono focus:ring-2 focus:ring-blue-500 outline-none text-black font-bold" 
+                  placeholder="123" 
+                  maxLength={3} 
+                />
               </div>
             </div>
 

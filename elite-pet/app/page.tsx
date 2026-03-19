@@ -7,11 +7,13 @@ import ProductCarousel from '../components/ProductCarousel';
 
 const MapWithNoSSR = dynamic(() => import('../components/Map'), { ssr: false, loading: () => <p className="p-4 text-gray-500">Harta se încarcă...</p> });
 
+// Am adăugat 'category' aici pentru a-l putea folosi opțional la filtrare
 interface Product {
   id: number;
   name: string;
   price: number;
   image_url: string;
+  category?: string;
 }
 
 export default function Home() {
@@ -25,6 +27,12 @@ export default function Home() {
   const [isBirthday, setIsBirthday] = useState(false);
   const [petName, setPetName] = useState('');
 
+  // --- STĂRI NOI PENTRU LIVE SEARCH ---
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+
+  // Funcția de adăugare în coș
   const addToCart = (productToAdd: Product) => {
     const existingCart = JSON.parse(localStorage.getItem('cart') || '[]');
     const itemIndex = existingCart.findIndex((item: any) => item.id === productToAdd.id);
@@ -51,13 +59,11 @@ export default function Home() {
     setIsLoggedIn(loggedIn);
     setUserName(localStorage.getItem('userName') || 'Client');
 
-    // VERIFICARE ZI DE NAȘTERE ANIMAL
     if (loggedIn) {
       const savedAnimals = localStorage.getItem('petsDataList');
       if (savedAnimals) {
         try {
           const animalsList = JSON.parse(savedAnimals);
-          // Căutăm dacă există vreun animal născut în luna curentă
           const birthdayPet = animalsList.find((pet: any) => {
              if (!pet.dob) return false;
              const dobMonth = new Date(pet.dob).getMonth();
@@ -82,6 +88,7 @@ export default function Home() {
     setIsBirthday(false);
   };
 
+  // Descărcarea produselor la montarea paginii
   useEffect(() => {
     async function fetchProducts() {
       try {
@@ -100,6 +107,21 @@ export default function Home() {
     fetchProducts();
   }, []);
 
+  // --- LOGICA PENTRU LIVE SEARCH ---
+  useEffect(() => {
+    if (searchQuery.trim().length >= 3) {
+      // Filtrăm rapid din memoria locală (produsele deja descărcate)
+      const results = products.filter(p => 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+      ).slice(0, 5); // Tăiem lista la maxim 5 rezultate ca să nu iasă din ecran
+      
+      setSearchResults(results);
+      setShowDropdown(true);
+    } else {
+      setShowDropdown(false);
+    }
+  }, [searchQuery, products]);
+
   return (
     <main className="min-h-screen bg-[#F4F5F7] font-sans">
       
@@ -112,12 +134,62 @@ export default function Home() {
 
       {/* Header Principal */}
       <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto flex justify-between items-center p-4">
-          <div className="flex items-center space-x-2">
+        <div className="max-w-7xl mx-auto flex justify-between items-center p-4 gap-4">
+          
+          <div className="flex items-center space-x-2 shrink-0">
             <Link href="/" className="text-3xl font-black tracking-tighter text-green-600">elite<span className="text-orange-500">pet</span></Link>
-            <span className="text-xs text-gray-400 hidden md:block ml-2 mt-2">magazin online pentru animale</span>
+            <span className="text-xs text-gray-400 hidden lg:block ml-2 mt-2">magazin online</span>
           </div>
-          <div className="flex items-center space-x-4 md:space-x-6">
+
+          {/* BARA DE CĂUTARE GLOBALĂ CU SUGESTII */}
+          <div className="hidden md:block flex-grow max-w-lg relative">
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchQuery.length >= 3 && setShowDropdown(true)}
+              // Timeout mic pentru a permite click-ului pe dropdown să se execute înainte să dispară lista
+              onBlur={() => setTimeout(() => setShowDropdown(false), 200)} 
+              placeholder="Caută produse (ex: Royal Canin, Jucarie)..." 
+              className="w-full border-2 border-gray-200 rounded-full py-2.5 px-5 focus:outline-none focus:border-green-600 transition text-sm font-bold text-gray-700 bg-gray-50 focus:bg-white"
+            />
+            <span className="absolute right-4 top-2.5 text-gray-400 text-lg">🔍</span>
+
+            {/* DROPDOWN SUGESTII */}
+            {showDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+                {searchResults.length > 0 ? (
+                  <ul>
+                    {searchResults.map(product => (
+                      <li key={product.id} className="border-b border-gray-50 last:border-0">
+                        <button 
+                          onClick={() => window.location.href = `/produs?id=${product.id}`}
+                          className="w-full text-left p-3 hover:bg-gray-50 flex items-center gap-3 transition"
+                        >
+                          <img src={product.image_url} alt={product.name} className="w-10 h-10 object-contain rounded" />
+                          <div className="flex-grow">
+                            <p className="text-sm font-bold text-gray-800 line-clamp-1">{product.name}</p>
+                            <p className="text-xs text-green-600 font-black">{product.price} Lei</p>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                    <li className="bg-gray-50 p-2 text-center border-t border-gray-100">
+                      <Link href={`/produse?categorie=toate`} className="text-xs font-bold text-green-600 hover:underline">
+                        Apasă Enter pentru toate rezultatele &rarr;
+                      </Link>
+                    </li>
+                  </ul>
+                ) : (
+                  <div className="p-4 text-center text-sm text-gray-500 font-bold">
+                    Nu am găsit produse pentru "{searchQuery}"
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-4 md:space-x-6 shrink-0">
             {isLoggedIn ? (
                <div className="hidden sm:block relative group py-2"> 
                  <Link href="/cont?tab=date" className="text-sm font-bold text-green-600 hover:text-green-800 transition pb-1 cursor-pointer flex items-center gap-1">
@@ -131,7 +203,6 @@ export default function Home() {
                      <p className="text-xs font-medium text-blue-200 mt-0.5">Membru ElitePet</p>
                    </div>
                    <ul className="flex flex-col py-2">
-                     {/* AICI ESTE FIX-UL PENTRU DROPDOWN (Adăugat ?tab=...) */}
                      <li><Link href="/cont?tab=date" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">👤 Date Personale</Link></li>
                      <li><Link href="/cont?tab=animal" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">🐾 Animalele Mele</Link></li>
                      <li><Link href="/cont?tab=comenzi" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 font-bold transition">📦 Istoric Comenzi</Link></li>
