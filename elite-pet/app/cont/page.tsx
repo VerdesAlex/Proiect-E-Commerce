@@ -2,14 +2,13 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+
+// AM ȘTERS IMPORTURILE DIRECTE DE jspdf ȘI html2canvas DE AICI!
 
 function ContulMeuContent() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
 
-  // Setăm tab-ul activ bazat pe link-ul accesat (dacă nu e specificat, e 'date')
   const [activeTab, setActiveTab] = useState(tabParam || 'date');
   const [userName, setUserName] = useState('Client');
   const [userEmail, setUserEmail] = useState('');
@@ -24,7 +23,6 @@ function ContulMeuContent() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
 
-  // Dacă utilizatorul navighează folosind dropdown-ul când este DEJA pe pagina de cont
   useEffect(() => {
     if (tabParam) {
       setActiveTab(tabParam);
@@ -83,19 +81,29 @@ function ContulMeuContent() {
     window.location.href='/';
   };
 
+  // FUNCȚIA REPARATĂ: IMPORTĂM DINAMIC LIBRĂRIILE DOAR LA CLICK
   const downloadPDF = async () => {
     const element = invoiceRef.current;
     if (!element) return;
+    
     setIsGeneratingPDF(true);
+    
     try {
+      // Magia Next.js: Importăm modulele doar pe partea de client, în momentul rulării
+      const html2canvas = (await import('html2canvas')).default;
+      const jsPDF = (await import('jspdf')).default;
+
       const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
+      
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Factura_EP_9024_${userName.replace(/\s+/g, '_')}.pdf`);
     } catch (error) {
+      console.error("Eroare generare PDF:", error);
       alert("A apărut o eroare la descărcarea PDF-ului.");
     } finally {
       setIsGeneratingPDF(false);
@@ -117,7 +125,6 @@ function ContulMeuContent() {
     <div className="min-h-screen bg-[#F4F5F7] font-sans relative">
       <div className="print:hidden">
         
-        {/* Navbar-ul cu Dropdown Actualizat */}
         <nav className="bg-white p-4 shadow-sm border-b sticky top-0 z-50">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
             <Link href="/" className="text-2xl font-black tracking-tight text-green-600">elite<span className="text-orange-500">pet</span></Link>
@@ -149,17 +156,16 @@ function ContulMeuContent() {
           </div>
 
           <div className="border-t border-gray-100">
-          <div className="max-w-7xl mx-auto flex space-x-8 text-sm font-bold text-gray-700 p-3 overflow-x-auto">
-            <Link href="/produse?categorie=caini" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Câini</Link>
-            <Link href="/produse?categorie=pisici" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Pisici</Link>
-            <Link href="/produse?categorie=pasari" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Păsări</Link>
-            <Link href="/produse" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Toate Produsele</Link>
+            <div className="max-w-7xl mx-auto flex space-x-8 text-sm font-bold text-gray-700 p-3 overflow-x-auto">
+              <Link href="/produse?categorie=caini" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Câini</Link>
+              <Link href="/produse?categorie=pisici" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Pisici</Link>
+              <Link href="/produse?categorie=pasari" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Păsări</Link>
+              <Link href="/produse" className="hover:text-green-600 border-b-2 border-transparent hover:border-green-600 pb-1 whitespace-nowrap">Toate Produsele</Link>
+            </div>
           </div>
-        </div>
         </nav>
 
         <div className="max-w-7xl mx-auto p-4 md:p-8 mt-4 flex flex-col md:flex-row gap-8">
-          {/* MENIU LATERAL (SIDEBAR) */}
           <aside className="w-full md:w-1/4">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="p-6 border-b border-gray-100 bg-[#183251] text-white">
@@ -167,7 +173,6 @@ function ContulMeuContent() {
                 <p className="text-sm font-bold opacity-90">Membru ElitePet</p>
               </div>
               <div className="flex flex-col">
-                {/* Folosim butoane normale aici pentru ca e deja pe pagina curentă */}
                 <button onClick={() => setActiveTab('date')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'date' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>👤 Date Personale</button>
                 <button onClick={() => setActiveTab('animal')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'animal' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>🐾 Animalele Mele</button>
                 <button onClick={() => setActiveTab('comenzi')} className={`p-4 text-left font-bold text-sm transition border-l-4 ${activeTab === 'comenzi' ? 'border-green-600 bg-gray-50 text-green-700' : 'border-transparent text-gray-800 hover:bg-gray-50 hover:text-black'}`}>📦 Comenzile Mele</button>
@@ -177,9 +182,7 @@ function ContulMeuContent() {
             </div>
           </aside>
 
-          {/* CONȚINUT PRINCIPAL */}
           <main className="w-full md:w-3/4">
-            
             {activeTab === 'date' && (
               <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-200">
                 <h2 className="text-2xl font-black text-black mb-6 border-b border-gray-200 pb-4">Date Personale</h2>
@@ -338,7 +341,6 @@ function ContulMeuContent() {
   );
 }
 
-// Avem nevoie de componenta Suspense pentru a folosi searchParams din Next.js
 export default function ContulMeu() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold">Se încarcă contul...</div>}>
