@@ -302,38 +302,43 @@ function ContulMeuContent() {
       {showInvoice && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div ref={invoiceRef} className="bg-white">
-              <div className="bg-gray-100 p-6 border-b border-gray-300 flex justify-between items-start">
-                <div><h2 className="text-2xl font-black text-black">Factură Fiscală</h2><p className="text-black font-bold text-sm mt-1">Seria EP Nr. 9024</p></div>
-                <div className="text-right text-black font-bold text-sm"><p>Data: 10/03/2026</p><p>Status: <span className="text-green-600">Achitată</span></p></div>
+            
+            {/* AM ADĂUGAT INLINE STYLES (HEX) PENTRU CULORI PENTRU A PREVENI EROAREA LAB() */}
+            <div ref={invoiceRef} style={{ backgroundColor: '#ffffff', color: '#000000' }}>
+              <div style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid #d1d5db' }} className="p-6 flex justify-between items-start">
+                <div><h2 className="text-2xl font-black" style={{ color: '#000000' }}>Factură Fiscală</h2><p className="font-bold text-sm mt-1" style={{ color: '#000000' }}>Seria EP Nr. 9024</p></div>
+                <div className="text-right font-bold text-sm" style={{ color: '#000000' }}><p>Data: 10/03/2026</p><p>Status: <span style={{ color: '#16a34a' }}>Achitată</span></p></div>
               </div>
-              <div className="p-6 font-mono text-sm text-black">
-                <div className="flex justify-between border-b-2 border-black pb-4 mb-4">
+              <div className="p-6 font-mono text-sm" style={{ color: '#000000' }}>
+                <div className="flex justify-between pb-4 mb-4" style={{ borderBottom: '2px solid #000000' }}>
                   <div><p className="font-black text-base uppercase">Furnizor:</p><p className="font-bold">ElitePet SRL</p><p>CUI: RO12345678</p><p>București, România</p></div>
                   <div className="text-right"><p className="font-black text-base uppercase">Client:</p><p className="font-bold">{userName}</p><p>{userEmail}</p></div>
                 </div>
                 <table className="w-full text-left border-collapse mb-6">
-                  <thead><tr className="border-b border-gray-400"><th className="py-2 font-black">Produs</th><th className="py-2 font-black text-center">Cant.</th><th className="py-2 font-black text-right">Preț unitar</th><th className="py-2 font-black text-right">Total</th></tr></thead>
+                  <thead><tr style={{ borderBottom: '1px solid #9ca3af' }}><th className="py-2 font-black">Produs</th><th className="py-2 font-black text-center">Cant.</th><th className="py-2 font-black text-right">Preț unitar</th><th className="py-2 font-black text-right">Total</th></tr></thead>
                   <tbody>
-                    <tr className="border-b border-gray-200"><td className="py-3 font-bold">Hrană uscată Câini Purina Pro Plan</td><td className="py-3 text-center font-bold">1</td><td className="py-3 text-right font-bold">289.00 Lei</td><td className="py-3 text-right font-bold">289.00 Lei</td></tr>
-                    <tr className="border-b border-gray-200"><td className="py-3 font-bold">Zgardă reflectorizantă M</td><td className="py-3 text-center font-bold">1</td><td className="py-3 text-right font-bold">56.00 Lei</td><td className="py-3 text-right font-bold">56.00 Lei</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}><td className="py-3 font-bold">Hrană uscată Câini Purina Pro Plan</td><td className="py-3 text-center font-bold">1</td><td className="py-3 text-right font-bold">289.00 Lei</td><td className="py-3 text-right font-bold">289.00 Lei</td></tr>
+                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}><td className="py-3 font-bold">Zgardă reflectorizantă M</td><td className="py-3 text-center font-bold">1</td><td className="py-3 text-right font-bold">56.00 Lei</td><td className="py-3 text-right font-bold">56.00 Lei</td></tr>
                   </tbody>
                 </table>
                 <div className="flex justify-end text-base">
                   <div className="w-full md:w-1/2">
-                    <div className="flex justify-between border-b border-gray-200 py-1 font-bold"><p>Subtotal:</p><p>345.00 Lei</p></div>
-                    <div className="flex justify-between border-b border-gray-200 py-1 font-bold"><p>Transport:</p><p>0.00 Lei</p></div>
-                    <div className="flex justify-between py-2 text-xl font-black mt-2 bg-gray-100 px-2 rounded"><p>TOTAL DE PLATĂ:</p><p>345.00 Lei</p></div>
+                    <div className="flex justify-between py-1 font-bold" style={{ borderBottom: '1px solid #e5e7eb' }}><p>Subtotal:</p><p>345.00 Lei</p></div>
+                    <div className="flex justify-between py-1 font-bold" style={{ borderBottom: '1px solid #e5e7eb' }}><p>Transport:</p><p>0.00 Lei</p></div>
+                    <div className="flex justify-between py-2 text-xl font-black mt-2 px-2 rounded" style={{ backgroundColor: '#f3f4f6' }}><p>TOTAL DE PLATĂ:</p><p>345.00 Lei</p></div>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* BUTOANELE RĂMÂN LA FEL, ELE NU INTRĂ ÎN PDF */}
             <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-4 mt-auto">
               <button onClick={downloadPDF} disabled={isGeneratingPDF} className={`text-white px-6 py-2 rounded font-bold transition flex items-center space-x-2 ${isGeneratingPDF ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
                 <span>{isGeneratingPDF ? 'Se generează...' : '⬇️ Descarcă PDF'}</span>
               </button>
               <button onClick={() => setShowInvoice(false)} className="bg-gray-800 hover:bg-black text-white px-6 py-2 rounded font-bold transition">Închide</button>
             </div>
+
           </div>
         </div>
       )}
