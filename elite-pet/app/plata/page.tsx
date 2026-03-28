@@ -5,9 +5,9 @@ import Link from 'next/link';
 
 export default function PaymentGateway() {
   const [total, setTotal] = useState(0);
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvc, setCvc] = useState('');
+  const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
+  const [expiryDate, setExpiryDate] = useState('12/26'); // Poți pune ce dată vrei aici
+  const [cvc, setCvc] = useState('123'); // La fel, orice 3 cifre
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
